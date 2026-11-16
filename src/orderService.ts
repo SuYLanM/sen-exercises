@@ -1,7 +1,7 @@
-import { MySqlConnection } from "./db";
 import { SmtpMailer } from "./mailer";
 import { OrderValidator } from "./orderValidator";
 import { PriceCalculator } from "./priceCalculator";
+import { OrderRepository } from "./orderRepository";
 import type { Order, Receipt } from "./order";
 
 /**
@@ -15,6 +15,7 @@ export class OrderService {
 
   readonly #validator = new OrderValidator();
   readonly #priceCalculator = new PriceCalculator();
+  readonly #repository = new OrderRepository();
 
   validate(order: Order): string[] {
     return this.#validator.validate(order);
@@ -35,18 +36,7 @@ export class OrderService {
 
     const receipt = this.calculate(order);
 
-    // Persistenz: Verbindung wird direkt hier erzeugt, SQL per String-Concatenation
-    const db = new MySqlConnection();
-    db.execute(
-      "INSERT INTO orders (id, email, total_cents) VALUES ('" +
-        order.id + "', '" + order.customerEmail + "', " + receipt.totalCents + ")",
-    );
-    for (const item of order.items) {
-      db.execute(
-        "INSERT INTO order_items (order_id, sku, qty) VALUES ('" +
-          order.id + "', '" + item.sku + "', " + item.quantity + ")",
-      );
-    }
+    this.#repository.save(order, receipt);
 
     // Benachrichtigung: Mailer wird ebenfalls direkt hier erzeugt
     const mailer = new SmtpMailer();

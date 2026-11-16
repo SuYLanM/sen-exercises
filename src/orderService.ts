@@ -1,13 +1,10 @@
-import { SmtpMailer } from "./mailer";
 import { OrderValidator } from "./orderValidator";
 import { PriceCalculator } from "./priceCalculator";
 import { OrderRepository } from "./orderRepository";
+import { NotificationService } from "./notificationService";
 import type { Order, Receipt } from "./order";
 
-/**
- * GOD CLASS.
- * Diese Klasse validiert, rechnet, speichert, mailt und loggt, alles auf einmal.
- */
+/** Koordiniert die Bearbeitung einer Bestellung. */
 export class OrderService {
   // Öffentlicher interner Zustand: jeder darf daran drehen.
   public lastReceipt: Receipt | null = null;
@@ -16,6 +13,7 @@ export class OrderService {
   readonly #validator = new OrderValidator();
   readonly #priceCalculator = new PriceCalculator();
   readonly #repository = new OrderRepository();
+  readonly #notificationService = new NotificationService();
 
   validate(order: Order): string[] {
     return this.#validator.validate(order);
@@ -38,13 +36,7 @@ export class OrderService {
 
     this.#repository.save(order, receipt);
 
-    // Benachrichtigung: Mailer wird ebenfalls direkt hier erzeugt
-    const mailer = new SmtpMailer();
-    mailer.send(
-      order.customerEmail,
-      "Bestellbestätigung " + order.id,
-      "Danke für Ihre Bestellung! Gesamtbetrag: " + (receipt.totalCents / 100).toFixed(2) + " EUR",
-    );
+    this.#notificationService.sendOrderConfirmation(order, receipt);
     this.sentMails++;
 
     this.lastReceipt = receipt;
